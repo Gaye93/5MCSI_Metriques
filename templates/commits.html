@@ -1,206 +1,166 @@
+
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Analyse des Commits GitHub</title>
+    <title>Votre Activité de Commits</title>
     <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
     <style>
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             margin: 0;
             padding: 20px;
-            background-color: #f8f9fa;
-            color: #333;
+            background-color: #f6f8fa;
+            color: #24292e;
         }
         .container {
-            max-width: 1200px;
+            max-width: 900px;
             margin: 0 auto;
         }
-        .header {
+        header {
             text-align: center;
             margin-bottom: 30px;
             padding: 20px;
             background: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-radius: 6px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         }
         h1 {
-            color: #2c3e50;
+            color: #0969da;
             margin-bottom: 10px;
         }
-        .chart-wrapper {
-            margin-bottom: 40px;
+        #chart_div {
+            width: 100%;
+            height: 500px;
             background: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-radius: 6px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
             padding: 20px;
         }
-        .chart-title {
-            font-size: 20px;
-            color: #2c3e50;
-            margin-bottom: 15px;
-            padding-bottom: 10px;
-            border-bottom: 1px solid #eee;
-        }
-        .chart {
-            width: 100%;
-            height: 400px;
-        }
-        .loading {
+        .loading, .error {
             text-align: center;
-            padding: 50px;
+            padding: 40px;
             font-size: 18px;
-            color: #7f8c8d;
         }
         .error {
-            color: #e74c3c;
-            text-align: center;
-            padding: 20px;
+            color: #cf222e;
+        }
+        .repo-info {
+            margin-top: 20px;
+            font-size: 14px;
+            color: #57606a;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="header">
-            <h1>Analyse des Commits GitHub</h1>
-            <p>Dépôt : Gaye93/5MCSI_Metriques</p>
-        </div>
-
-        <!-- Graphique par date -->
-        <div class="chart-wrapper">
-            <div class="chart-title">Commits par Date</div>
-            <div id="date_chart" class="chart">
-                <div class="loading">Chargement des données par date...</div>
+        <header>
+            <h1>Votre Activité de Commits</h1>
+            <p>Répartition minute par minute sur votre dépôt GitHub</p>
+            <div class="repo-info">
+                Dépôt suivi : <strong>Gaye93/5MCSI_Metriques</strong>
             </div>
-        </div>
-
-        <!-- Graphique par minute -->
-        <div class="chart-wrapper">
-            <div class="chart-title">Commits par Minute de l'Heure</div>
-            <div id="minute_chart" class="chart">
-                <div class="loading">Chargement des données par minute...</div>
-            </div>
+        </header>
+        
+        <div id="chart_div">
+            <div class="loading">Chargement des données depuis GitHub...</div>
         </div>
     </div>
 
     <script>
         google.charts.load('current', { packages: ['corechart'] });
-        google.charts.setOnLoadCallback(loadCommitData);
+        google.charts.setOnLoadCallback(loadCommitActivity);
 
-        function loadCommitData() {
+        function loadCommitActivity() {
             const apiUrl = 'https://api.github.com/repos/Gaye93/5MCSI_Metriques/commits';
             
             fetch(apiUrl)
                 .then(response => {
-                    if (!response.ok) throw new Error(`Erreur: ${response.status}`);
+                    if (!response.ok) {
+                        throw new Error(`Erreur GitHub: ${response.status} - ${response.statusText}`);
+                    }
                     return response.json();
                 })
                 .then(commits => {
                     if (!commits || commits.length === 0) {
-                        throw new Error('Aucun commit trouvé');
+                        throw new Error('Aucun commit trouvé dans ce dépôt');
                     }
-                    drawDateChart(commits);
-                    drawMinuteChart(commits);
+                    renderCommitChart(commits);
                 })
                 .catch(error => {
-                    console.error(error);
-                    document.getElementById('date_chart').innerHTML = 
-                        `<div class="error">${error.message}</div>`;
-                    document.getElementById('minute_chart').innerHTML = 
-                        `<div class="error">${error.message}</div>`;
+                    console.error('Erreur:', error);
+                    document.getElementById('chart_div').innerHTML = 
+                        `<div class="error">Erreur: ${error.message}</div>`;
                 });
         }
 
-        function drawDateChart(commits) {
-            // Groupement par date
-            const dateCounts = {};
-            
-            commits.forEach(commit => {
-                const dateStr = commit.commit.author.date;
-                const date = new Date(dateStr);
-                const formattedDate = date.toLocaleDateString('fr-FR', {
-                    day: '2-digit',
-                    month: 'short',
-                    year: 'numeric'
-                });
-                
-                dateCounts[formattedDate] = (dateCounts[formattedDate] || 0) + 1;
-            });
-
-            // Conversion en tableau et tri
-            const dateData = Object.entries(dateCounts)
-                .sort((a, b) => new Date(a[0]) - new Date(b[0]));
-
-            // Préparation des données
-            const data = new google.visualization.DataTable();
-            data.addColumn('string', 'Date');
-            data.addColumn('number', 'Commits');
-            
-            dateData.forEach(([date, count]) => {
-                data.addRow([date, count]);
-            });
-
-            // Options du graphique
-            const options = {
-                title: '',
-                hAxis: {
-                    title: 'Date',
-                    slantedText: true,
-                    slantedTextAngle: 45,
-                    showTextEvery: Math.ceil(dateData.length / 10)
-                },
-                vAxis: {
-                    title: 'Nombre de commits',
-                    minValue: 0
-                },
-                colors: ['#3498db'],
-                bar: { groupWidth: '80%' },
-                legend: { position: 'none' }
-            };
-
-            // Dessin
-            const chart = new google.visualization.ColumnChart(document.getElementById('date_chart'));
-            chart.draw(data, options);
-        }
-
-        function drawMinuteChart(commits) {
-            // Comptage par minute
+        function renderCommitChart(commits) {
+            // Préparer les données : comptage des commits par minute
             const minuteCounts = Array(60).fill(0);
             
             commits.forEach(commit => {
-                const dateStr = commit.commit.author.date;
-                const minute = parseInt(dateStr.split('T')[1].substring(3, 5));
-                minuteCounts[minute]++;
+                try {
+                    const dateStr = commit.commit.author.date;
+                    const minute = extractMinuteFromDate(dateStr);
+                    minuteCounts[minute]++;
+                } catch (e) {
+                    console.warn('Format de date invalide:', commit.commit.author.date);
+                }
             });
 
-            // Préparation des données
-            const data = new google.visualization.DataTable();
-            data.addColumn('string', 'Minute');
-            data.addColumn('number', 'Commits');
-            
-            for (let m = 0; m < 60; m++) {
-                data.addRow([m.toString(), minuteCounts[m]]);
+            // Préparer les données pour le graphique
+            const chartData = [['Minute', 'Nombre de Commits']];
+            for (let minute = 0; minute < 60; minute++) {
+                chartData.push([`${minute} min`, minuteCounts[minute]]);
             }
 
-            // Options du graphique
+            // Dessiner le graphique
+            const data = google.visualization.arrayToDataTable(chartData);
+            
             const options = {
-                title: '',
+                title: 'Distribution des commits par minute',
+                titleTextStyle: {
+                    fontSize: 18,
+                    color: '#24292e',
+                    bold: false
+                },
                 hAxis: {
                     title: 'Minute de l\'heure',
-                    ticks: [0, 15, 30, 45, 59]
+                    titleTextStyle: { color: '#57606a' },
+                    gridlines: { color: '#eaeef2' },
+                    minorGridlines: { count: 4 },
+                    viewWindow: { min: 0, max: 59 }
                 },
                 vAxis: {
                     title: 'Nombre de commits',
-                    minValue: 0
+                    minValue: 0,
+                    gridlines: { color: '#eaeef2' },
+                    titleTextStyle: { color: '#57606a' }
                 },
-                colors: ['#e74c3c'],
-                bar: { groupWidth: '95%' },
-                legend: { position: 'none' }
+                colors: ['#2da44e'],
+                legend: { position: 'none' },
+                bar: { groupWidth: '90%' },
+                backgroundColor: 'transparent',
+                chartArea: {
+                    backgroundColor: 'transparent',
+                    width: '85%',
+                    height: '70%'
+                },
+                animation: {
+                    duration: 1000,
+                    easing: 'out',
+                    startup: true
+                }
             };
 
-            // Dessin
-            const chart = new google.visualization.ColumnChart(document.getElementById('minute_chart'));
+            const chart = new google.visualization.ColumnChart(document.getElementById('chart_div'));
             chart.draw(data, options);
+        }
+
+        function extractMinuteFromDate(dateStr) {
+            // Extraire la minute du format ISO 8601 (ex: "2024-02-11T11:57:27Z")
+            const timePart = dateStr.split('T')[1];
+            return parseInt(timePart.substring(3, 5));
         }
     </script>
 </body>
