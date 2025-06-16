@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Votre Activité de Commits</title>
+    <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f6f8fa;
+            color: #24292e;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: white;
+            border-radius: 6px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #0969da;
+            margin-bottom: 10px;
+        }
+        #chart_div {
+            width: 100%;
+            height: 500px;
+            background: white;
+            border-radius: 6px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            padding: 20px;
+        }
+        .loading, .error {
+            text-align: center;
+            padding: 40px;
+            font-size: 18px;
+        }
+        .error {
+            color: #cf222e;
+        }
+        .repo-info {
+            margin-top: 20px;
+            font-size: 14px;
+            color: #57606a;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Votre Activité de Commits</h1>
+            <p>Répartition minute par minute sur votre dépôt GitHub</p>
+            <div class="repo-info">
+                Dépôt suivi : <strong>Gaye93/5MCSI_Metriques</strong>
+            </div>
+        </header>
+        
+        <div id="chart_div">
+            <div class="loading">Chargement des données depuis GitHub...</div>
+        </div>
+    </div>
+
+    <script>
+        google.charts.load('current', { packages: ['corechart'] });
+        google.charts.setOnLoadCallback(loadCommitActivity);
+
+        function loadCommitActivity() {
+            const apiUrl = 'https://api.github.com/repos/Gaye93/5MCSI_Metriques/commits';
+            
+            fetch(apiUrl)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Erreur GitHub: ${response.status} - ${response.statusText}`);
+                    }
+                    return response.json();
+                })
+                .then(commits => {
+                    if (!commits || commits.length === 0) {
+                        throw new Error('Aucun commit trouvé dans ce dépôt');
+                    }
+                    renderCommitChart(commits);
+                })
+                .catch(error => {
+                    console.error('Erreur:', error);
+                    document.getElementById('chart_div').innerHTML = 
+                        `<div class="error">Erreur: ${error.message}</div>`;
+                });
+        }
+
+        function renderCommitChart(commits) {
+            // Préparer les données : comptage des commits par minute
+            const minuteCounts = Array(60).fill(0);
+            
+            commits.forEach(commit => {
+                try {
+                    const dateStr = commit.commit.author.date;
+                    const minute = extractMinuteFromDate(dateStr);
+                    minuteCounts[minute]++;
+                } catch (e) {
+                    console.warn('Format de date invalide:', commit.commit.author.date);
+                }
+            });
+
+            // Préparer les données pour le graphique
+            const chartData = [['Minute', 'Nombre de Commits']];
+            for (let minute = 0; minute < 60; minute++) {
+                chartData.push([`${minute} min`, minuteCounts[minute]]);
+            }
+
+            // Dessiner le graphique
+            const data = google.visualization.arrayToDataTable(chartData);
+            
+            const options = {
+                title: 'Distribution des commits par minute',
+                titleTextStyle: {
+                    fontSize: 18,
+                    color: '#24292e',
+                    bold: false
+                },
+                hAxis: {
+                    title: 'Minute de l\'heure',
+                    titleTextStyle: { color: '#57606a' },
+                    gridlines: { color: '#eaeef2' },
+                    minorGridlines: { count: 4 },
+                    viewWindow: { min: 0, max: 59 }
+                },
+                vAxis: {
+                    title: 'Nombre de commits',
+                    minValue: 0,
+                    gridlines: { color: '#eaeef2' },
+                    titleTextStyle: { color: '#57606a' }
+                },
+                colors: ['#2da44e'],
+                legend: { position: 'none' },
+                bar: { groupWidth: '90%' },
+                backgroundColor: 'transparent',
+                chartArea: {
+                    backgroundColor: 'transparent',
+                    width: '85%',
+                    height: '70%'
+                },
+                animation: {
+                    duration: 1000,
+                    easing: 'out',
+                    startup: true
+                }
+            };
+
+            const chart = new google.visualization.ColumnChart(document.getElementById('chart_div'));
+            chart.draw(data, options);
+        }
+
+        function extractMinuteFromDate(dateStr) {
+            // Extraire la minute du format ISO 8601 (ex: "2024-02-11T11:57:27Z")
+            const timePart = dateStr.split('T')[1];
+            return parseInt(timePart.substring(3, 5));
+        }
+    </script>
+</body>
+</html>
